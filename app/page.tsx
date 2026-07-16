@@ -29,21 +29,6 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-cream">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3">
-          <Image src="/assets/imagewithlogo1.png" alt="KraveEat logo" width={48} height={48} className="rounded-full" />
-          <div>
-            <p className="text-xl font-black text-brown">KraveEat</p>
-            <p className="text-sm text-orange">Fast food in Abuja</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-brown">
-          <Link href="/menu" className="rounded-full px-3 py-2 hover:bg-white/70">Menu</Link>
-          <Link href="/checkout" className="rounded-full bg-brown px-3 py-2 text-white">Cart ({cart.length})</Link>
-          <Link href="/admin" className="rounded-full border border-brown/20 px-3 py-2">Admin</Link>
-        </div>
-      </nav>
-
       <section className="mx-auto grid max-w-7xl gap-8 px-4 pb-12 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:pb-20">
         <div className="space-y-6 rounded-[2rem] bg-white/70 p-6 shadow-lg shadow-brown/10 sm:p-8">
           <div className="inline-flex rounded-full bg-orange/20 px-3 py-1 text-sm font-semibold text-orange">Abuja • South End Estate</div>

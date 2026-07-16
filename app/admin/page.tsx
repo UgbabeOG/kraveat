@@ -75,6 +75,7 @@ export default function AdminPage() {
     e.preventDefault();
     if (password === adminPassword) {
       setAuthorized(true);
+      window.localStorage.setItem("kraveat-admin-authorized", "true");
     } else {
       alert("Wrong password");
     }
