@@ -55,6 +55,28 @@ export const products: Product[] = [
     featured: true,
     popular: true,
   },
+  {
+    id: 5,
+    name: 'Noodles',
+    category: 'Noodles',
+    price: 3200,
+    image: '/assets/noodles.jpeg',
+    description: 'Delicious stir-fried noodles with vegetables and sauce.',
+    available: true,
+    featured: false,
+    popular: false,
+  },
+  {
+    id: 6,
+    name: 'Pizza',
+    category: 'Pizza',
+    price: 5500,
+    image: '/assets/pizza.jpeg',
+    description: 'Cheesy pizza with fresh toppings and crispy crust.',
+    available: true,
+    featured: false,
+    popular: false,
+  },
 ];
 
 export const categories = Array.from(
