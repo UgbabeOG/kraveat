@@ -1,0 +1,11 @@
+[
+  {
+    "id": "order_1786628668017_glvdahw",
+    "customerName": "Jane Doe",
+    "customerPhone": "08012345678",
+    "customerAddress": "Maitama, Abuja",
+    "items": "[{\"id\":1,\"name\":\"Classic Burger\",\"quantity\":1,\"price\":4500}]",
+    "total": 4500,
+    "status": "NEW"
+  }
+]

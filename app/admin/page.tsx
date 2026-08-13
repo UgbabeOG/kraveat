@@ -1,204 +1,197 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { uploadMenuImage } from "@/lib/supabase";
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { uploadMenuImage } from '@/lib/supabase';
+import { products as initialProducts, Product } from '@/lib/products';
+import { cn, formatNaira } from '@/lib/utils';
 
-const adminPassword = process.env.PASSWORD || "";
-
-type MenuItem = {
-  id: number;
-  name: string;
-  category: string;
-  price: number;
-  available: boolean;
-  description: string;
-};
-
-const starterItems: MenuItem[] = [
-  {
-    id: 1,
-    name: "Classic Burger",
-    category: "Burger",
-    price: 4500,
-    available: true,
-    description: "Signature burger",
-  },
-  {
-    id: 2,
-    name: "Chicken Shawarma",
-    category: "Shawarma",
-    price: 3500,
-    available: true,
-    description: "Flavorful shawarma",
-  },
-  {
-    id: 3,
-    name: "Loaded Fries",
-    category: "Loaded Fries",
-    price: 2800,
-    available: true,
-    description: "Loaded fries",
-  },
-  {
-    id: 4,
-    name: "Chicken & Chips",
-    category: "Chicken & Chips",
-    price: 4200,
-    available: true,
-    description: "Crispy chicken",
-  },
-];
+type AdminItem = Product & { available: boolean };
 
 export default function AdminPage() {
-  const [authorized, setAuthorized] = useState(false);
-  const [password, setPassword] = useState("");
-  const [items, setItems] = useState<MenuItem[]>(starterItems);
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("Burger");
-  const [price, setPrice] = useState("4500");
-  const [description, setDescription] = useState("");
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('kraveat-admin-authorized') === 'true';
+  });
+  const [items, setItems] = useState<AdminItem[]>([]);
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('Burger');
+  const [price, setPrice] = useState('4500');
+  const [description, setDescription] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [orders, setOrders] = useState<{ id: string; customerName: string; customerPhone: string; customerAddress: string; items: string; total: number; status: string }[]>([]);
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem("kraveat-admin-items");
-    if (saved) {
-      setItems(JSON.parse(saved));
+  const loadItems = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('kraveat-admin-items');
+    if (stored) {
+      setItems(JSON.parse(stored));
+    } else {
+      setItems(
+        initialProducts.map((p) => ({
+          ...p,
+          available: true,
+        })),
+      );
     }
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("kraveat-admin-items", JSON.stringify(items));
-  }, [items]);
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/admin/verify');
+        if (response.ok) {
+          setAuthorized(true);
+          loadItems();
+        } else {
+          router.push('/admin/login');
+        }
+      } catch {
+        router.push('/admin/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkAuth();
+  }, [router, loadItems]);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === adminPassword) {
-      setAuthorized(true);
-      window.localStorage.setItem("kraveat-admin-authorized", "true");
-    } else {
-      alert("Wrong password");
-    }
-  };
+  useEffect(() => {
+    if (!authorized) return;
+    window.localStorage.setItem('kraveat-admin-items', JSON.stringify(items));
+  }, [items, authorized]);
 
-  const addItem = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!authorized) return;
+    const fetchOrders = async () => {
+      try {
+        const response = await fetch('/api/admin/orders');
+        if (response.ok) {
+          const data = await response.json();
+          setOrders(data.orders || []);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, [authorized]);
+
+  const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    let imageUrl = "";
+    let imageUrl = '';
     if (imageFile) {
       setUploading(true);
       try {
-        imageUrl = (await uploadMenuImage(imageFile)) || "";
-      } catch (error) {
-        console.error(error);
-        alert(
-          "Image upload failed. Continue with a placeholder image if Supabase is not configured.",
-        );
+        imageUrl = (await uploadMenuImage(imageFile)) || '';
+      } catch {
+        alert('Image upload failed. Saving without image.');
       } finally {
         setUploading(false);
       }
     }
 
-    const newItem: MenuItem = {
+    const newItem: AdminItem = {
       id: Date.now(),
       name: name.trim(),
       category,
       price: Number(price) || 0,
       available: true,
-      description: description.trim(),
+      description: description.trim() || '',
+      image: imageUrl || '/assets/imagewithlogo1.png',
+      featured: false,
+      popular: false,
     };
-    setItems((prev: MenuItem[]) => [...prev, newItem]);
-    setName("");
-    setPrice("");
-    setDescription("");
+
+    setItems((prev) => [...prev, newItem]);
+    setName('');
+    setCategory('Burger');
+    setPrice('4500');
+    setDescription('');
     setImageFile(null);
-    if (imageUrl) {
-      console.log("Uploaded image URL:", imageUrl);
-    }
   };
 
   const toggleAvailability = (id: number) => {
-    setItems((prev: MenuItem[]) =>
-      prev.map((item: MenuItem) =>
+    setItems((prev) =>
+      prev.map((item) =>
         item.id === id ? { ...item, available: !item.available } : item,
       ),
     );
   };
 
   const removeItem = (id: number) => {
-    setItems((prev: MenuItem[]) =>
-      prev.filter((item: MenuItem) => item.id !== id),
-    );
+    setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  if (!authorized) {
+  const updateOrderStatus = async (orderId: string, status: string) => {
+    try {
+      await fetch('/api/admin/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status }),
+      });
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, status } : order,
+        ),
+      );
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    router.push('/');
+  };
+
+  if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-cream px-4">
-        <form
-          onSubmit={handleLogin}
-          className="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-lg"
-        >
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-orange">
-            Admin Access
-          </p>
-          <h1 className="mt-2 text-3xl font-black text-brown">
-            KraveEat dashboard
-          </h1>
-          <p className="mt-2 text-sm text-brown/70">
-            Use the password to access menu management.
-          </p>
-          <input
-            value={password}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setPassword(e.target.value)
-            }
-            type="password"
-            className="mt-6 w-full rounded-full border border-brown/20 bg-cream px-4 py-3"
-            placeholder="Enter password"
-          />
-          <button className="mt-4 w-full rounded-full bg-orange px-4 py-3 font-semibold text-brown">
-            Login
-          </button>
-        </form>
+      <main className="flex min-h-screen items-center justify-center bg-cream">
+        <p className="text-lg font-semibold text-brown">Loading...</p>
       </main>
     );
   }
 
+  if (!authorized) {
+    return null;
+  }
+
   return (
     <main className="min-h-screen bg-cream px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl rounded-[2rem] bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="mx-auto max-w-7xl space-y-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-orange">
-              Admin dashboard
-            </p>
-            <h1 className="text-3xl font-black text-brown">
-              Manage menu and orders
-            </h1>
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-orange">Admin dashboard</p>
+            <h1 className="text-3xl font-black text-brown">Manage menu and orders</h1>
           </div>
+          <button
+            onClick={handleLogout}
+            className="rounded-full border border-brown/20 px-4 py-2 text-sm font-semibold text-brown hover:bg-white/70 transition"
+          >
+            Logout
+          </button>
         </div>
 
-        <section className="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-          <form
-            onSubmit={addItem}
-            className="space-y-4 rounded-[1.75rem] bg-cream p-5"
-          >
+        <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <form onSubmit={handleAddItem} className="space-y-4 rounded-[1.75rem] bg-cream p-5">
             <h2 className="text-xl font-black text-brown">Add a new item</h2>
             <input
               value={name}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setName(e.target.value)
-              }
-              className="w-full rounded-full border border-brown/20 bg-white px-4 py-3"
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-full border border-brown/20 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange focus:ring-offset-2"
               placeholder="Item name"
             />
             <select
               value={category}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                setCategory(e.target.value)
-              }
-              className="w-full rounded-full border border-brown/20 bg-white px-4 py-3"
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full rounded-full border border-brown/20 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange focus:ring-offset-2"
             >
               <option>Burger</option>
               <option>Shawarma</option>
@@ -207,38 +200,30 @@ export default function AdminPage() {
             </select>
             <input
               value={price}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setPrice(e.target.value)
-              }
-              className="w-full rounded-full border border-brown/20 bg-white px-4 py-3"
+              onChange={(e) => setPrice(e.target.value)}
+              className="w-full rounded-full border border-brown/20 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange focus:ring-offset-2"
               placeholder="Price"
+              type="number"
+              min="0"
             />
             <textarea
               value={description}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                setDescription(e.target.value)
-              }
-              className="min-h-24 w-full rounded-[1.25rem] border border-brown/20 bg-white px-4 py-3"
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-24 w-full rounded-[1.25rem] border border-brown/20 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange focus:ring-offset-2"
               placeholder="Description"
             />
             <input
               type="file"
               accept="image/*"
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setImageFile(e.target.files?.[0] || null)
-              }
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
               className="w-full rounded-full border border-brown/20 bg-white px-4 py-3"
             />
             <button
               disabled={uploading}
-              className="w-full rounded-full bg-brown px-4 py-3 font-semibold text-white disabled:opacity-70"
+              className="w-full rounded-full bg-brown px-4 py-3 font-semibold text-white disabled:opacity-70 hover:bg-brown/90 transition"
             >
-              {uploading ? "Uploading..." : "Save item"}
+              {uploading ? 'Uploading...' : 'Save item'}
             </button>
-            <p className="text-sm text-brown/70">
-              Upload product images and update availability without touching
-              code. Supabase storage is wired in for production use.
-            </p>
           </form>
 
           <div className="space-y-4">
@@ -252,19 +237,22 @@ export default function AdminPage() {
                   <div>
                     <p className="font-semibold text-brown">{item.name}</p>
                     <p className="text-sm text-brown/70">
-                      {item.category} • ₦{item.price}
+                      {item.category} • {formatNaira(item.price)}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => toggleAvailability(item.id)}
-                      className={`rounded-full px-3 py-2 text-sm font-semibold ${item.available ? "bg-orange text-brown" : "bg-brown text-white"}`}
+                      className={cn(
+                        'rounded-full px-3 py-2 text-sm font-semibold transition',
+                        item.available ? 'bg-orange text-brown hover:bg-accent-hover' : 'bg-brown text-white hover:bg-brown/90'
+                      )}
                     >
-                      {item.available ? "Available" : "Sold Out"}
+                      {item.available ? 'Available' : 'Sold Out'}
                     </button>
                     <button
                       onClick={() => removeItem(item.id)}
-                      className="rounded-full bg-cream px-3 py-2 text-sm font-semibold text-brown"
+                      className="rounded-full bg-cream px-3 py-2 text-sm font-semibold text-brown hover:bg-brown/10 transition"
                     >
                       Delete
                     </button>
@@ -275,17 +263,46 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[1.75rem] bg-cream p-5">
+        <section className="rounded-[1.75rem] bg-cream p-5">
           <h2 className="text-xl font-black text-brown">Incoming orders</h2>
-          <div className="mt-4 rounded-[1.25rem] bg-white p-4">
-            <p className="font-semibold text-brown">Order #001</p>
-            <p className="text-sm text-brown/70">
-              Customer: Ada • Phone: 09030707047 • Address: South End Estate
-            </p>
-            <p className="mt-2 text-sm text-brown/70">
-              Items: Classic Burger x1, Chicken Shawarma x2
-            </p>
-          </div>
+          {orders.length === 0 ? (
+            <p className="mt-4 text-sm text-brown/70">No orders yet. Orders will appear here after customers submit via WhatsApp.</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {orders.map((order) => (
+                <div key={order.id} className="rounded-[1.25rem] bg-white p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-brown">Order #{order.id.slice(-6)}</p>
+                    <span className="rounded-full bg-orange/20 px-2.5 py-1 text-xs font-semibold text-orange uppercase tracking-wider">
+                      {order.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-brown/70">
+                    Customer: {order.customerName} • Phone: {order.customerPhone} • Address: {order.customerAddress}
+                  </p>
+                  <p className="mt-2 text-sm text-brown/70">
+                    Items: {order.items}
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-brown">Total: {formatNaira(order.total)}</p>
+                  <div className="mt-3">
+                    <select
+                      value={order.status}
+                      onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                      className="rounded-full border border-brown/20 bg-cream px-3 py-2 text-sm font-semibold text-brown focus:outline-none focus:ring-2 focus:ring-orange focus:ring-offset-2"
+                    >
+                      <option>NEW</option>
+                      <option>CONFIRMED</option>
+                      <option>PREPARING</option>
+                      <option>READY</option>
+                      <option>OUT FOR DELIVERY</option>
+                      <option>COMPLETED</option>
+                      <option>CANCELLED</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>
