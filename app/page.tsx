@@ -126,12 +126,12 @@ export default function HomePage() {
                 !item.available && 'opacity-60'
               )}
             >
-              <div className="relative h-44 w-full overflow-hidden bg-cream">
+              <div className="relative h-40 w-full overflow-hidden bg-cream sm:h-44 md:h-48">
                 <Image
                   src={item.image}
                   alt={item.name}
-                  width={600}
-                  height={400}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                   className="h-full w-full object-cover"
                 />
                 {!item.available && (

@@ -81,8 +81,8 @@ export default function MenuPage() {
               !item.available && 'opacity-60'
             )}
           >
-            <div className="relative h-44 w-full overflow-hidden bg-cream">
-              <Image src={item.image} alt={item.name} width={600} height={400} className="h-full w-full object-cover" />
+            <div className="relative h-40 w-full overflow-hidden bg-cream sm:h-44 md:h-48">
+              <Image src={item.image} alt={item.name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="h-full w-full object-cover" />
               {!item.available && (
                 <div className="absolute inset-0 flex items-center justify-center bg-brown/40">
                   <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-brown">SOLD OUT</span>
