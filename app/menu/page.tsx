@@ -82,7 +82,7 @@ export default function MenuPage() {
             )}
           >
             <div className="relative h-40 w-full overflow-hidden bg-cream sm:h-44 md:h-48">
-              <Image src={item.image} alt={item.name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="h-full w-full object-cover" />
+              <Image src={item.image} alt={item.name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="absolute inset-0 object-cover object-center" />
               {!item.available && (
                 <div className="absolute inset-0 flex items-center justify-center bg-brown/40">
                   <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-brown">SOLD OUT</span>

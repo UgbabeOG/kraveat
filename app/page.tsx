@@ -132,7 +132,7 @@ export default function HomePage() {
                   alt={item.name}
                   fill
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                  className="h-full w-full object-cover"
+                  className="absolute inset-0 object-cover object-center"
                 />
                 {!item.available && (
                   <div className="absolute inset-0 flex items-center justify-center bg-brown/40">
