@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode, useSyncExternalStore } from 'react';
+import { createContext, useContext, ReactNode, useSyncExternalStore } from 'react';
 import { Product } from './products';
 import { formatNaira } from './utils';
 
@@ -25,6 +25,8 @@ const CART_STORAGE_KEY = 'kraveat-cart';
 
 let cachedServerSnapshot: CartItem[] = [];
 let cachedClientSnapshot: CartItem[] = [];
+let clientSnapshotInitialized = false;
+const cartListeners = new Set<() => void>();
 
 function getCartFromStorage(): CartItem[] {
   if (typeof window === 'undefined') return cachedServerSnapshot;
@@ -33,7 +35,6 @@ function getCartFromStorage(): CartItem[] {
     if (stored) {
       const parsed = JSON.parse(stored) as CartItem[];
       if (Array.isArray(parsed)) {
-        cachedClientSnapshot = parsed;
         return parsed;
       }
     }
@@ -43,29 +44,55 @@ function getCartFromStorage(): CartItem[] {
   return cachedClientSnapshot;
 }
 
+function getClientSnapshot() {
+  if (!clientSnapshotInitialized) {
+    cachedClientSnapshot = getCartFromStorage();
+    clientSnapshotInitialized = true;
+  }
+  return cachedClientSnapshot;
+}
+
 function subscribeToCart(callback: () => void) {
   if (typeof window === 'undefined') return () => {};
-  window.addEventListener('storage', callback);
-  return () => window.removeEventListener('storage', callback);
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === CART_STORAGE_KEY) {
+      cachedClientSnapshot = getCartFromStorage();
+      clientSnapshotInitialized = true;
+      callback();
+    }
+  };
+  cartListeners.add(callback);
+  window.addEventListener('storage', handleStorage);
+  return () => {
+    cartListeners.delete(callback);
+    window.removeEventListener('storage', handleStorage);
+  };
+}
+
+function setCart(items: CartItem[]) {
+  cachedClientSnapshot = items;
+  clientSnapshotInitialized = true;
+  window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  cartListeners.forEach((listener) => listener());
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const items = useSyncExternalStore(subscribeToCart, getCartFromStorage, () => cachedServerSnapshot);
+  const items = useSyncExternalStore(subscribeToCart, getClientSnapshot, () => cachedServerSnapshot);
 
   const addToCart = (product: Product) => {
-    const current = getCartFromStorage();
+    const current = [...getCartFromStorage()];
     const existing = current.find((item) => item.product.id === product.id);
     if (existing) {
       existing.quantity += 1;
     } else {
       current.push({ product, quantity: 1 });
     }
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(current));
+    setCart(current);
   };
 
   const removeFromCart = (productId: number) => {
     const current = getCartFromStorage().filter((item) => item.product.id !== productId);
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(current));
+    setCart(current);
   };
 
   const updateQuantity = (productId: number, quantity: number) => {
@@ -73,16 +100,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeFromCart(productId);
       return;
     }
-    const current = getCartFromStorage();
+    const current = [...getCartFromStorage()];
     const item = current.find((i) => i.product.id === productId);
     if (item) {
       item.quantity = quantity;
-      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(current));
+      setCart(current);
     }
   };
 
   const clearCart = () => {
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
+    setCart([]);
   };
 
   const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
